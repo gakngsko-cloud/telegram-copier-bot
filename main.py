@@ -95,13 +95,12 @@ async def handle_message(event, rule):
                 log.error(f"Copy failed via Bot, trying Telethon... [{rule['name']}]")
                 copied = await event.message.copy_to(rule["destination"])
 
-        # 2. REACTION (via User Account for multiple support)
+        # 2. REACTION
         if react_on and rule.get("reaction"):
             emojis = [e.strip() for e in rule["reaction"].split(",") if e.strip()]
             if emojis:
                 try:
                     if copied:
-                        # Destination mein message fetch karke apne account se react karo
                         try:
                             dest_msg = await reader.get_messages(rule["destination"], ids=copied.id)
                             if dest_msg:
@@ -110,14 +109,12 @@ async def handle_message(event, rule):
                                 log.info(f"💫 [{rule['name']}] reacted on copy via User Account ({emojis})")
                         except Exception as e:
                             log.warning(f"Telethon react on copy failed, trying bot: {e}")
-                            # Fallback to bot (bot sirf ek emoji support karta hai)
                             await app.bot.set_message_reaction(
                                 chat_id=rule["destination"],
                                 message_id=copied.id,
                                 reaction=emojis[0]
                             )
                     else:
-                        # React on source message via User Account
                         await event.message.react(emojis)
                         log.info(f"💫 [{rule['name']}] reacted on source via User Account ({emojis})")
                 except Exception as e:
@@ -507,4 +504,14 @@ async def main():
     log.info("✅ Bot polling started")
 
     await reader.start()
-    log.info(
+    log.info("✅ Reader logged in")
+
+    await verify_access()
+    log.info("🟢 Bot 24/7 chalu hai.")
+    await reader.run_until_disconnected()
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        log.info("🛑 Stopped.")
