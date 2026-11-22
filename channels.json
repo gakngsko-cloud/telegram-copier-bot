@@ -1,0 +1,194 @@
+[
+  {
+    "name": "Channel 1",
+    "source": -1001111111111,
+    "destination": -1009999999991,
+    "reaction": "👍",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 2",
+    "source": -1001111111112,
+    "destination": -1009999999992,
+    "reaction": "🔥",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 3",
+    "source": -1001111111113,
+    "destination": -1009999999993,
+    "reaction": "❤️",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 4",
+    "source": -1001111111114,
+    "destination": -1009999999994,
+    "reaction": "😂",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 5",
+    "source": -1001111111115,
+    "destination": -1009999999995,
+    "reaction": "😮",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 6",
+    "source": -1001111111116,
+    "destination": -1009999999996,
+    "reaction": "😢",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 7",
+    "source": -1001111111117,
+    "destination": -1009999999997,
+    "reaction": "🙏",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 8",
+    "source": -1001111111118,
+    "destination": -1009999999998,
+    "reaction": "👏",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 9",
+    "source": -1001111111119,
+    "destination": -1009999999999,
+    "reaction": "🎉",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 10",
+    "source": -1001111111120,
+    "destination": -1009999999900,
+    "reaction": "💯",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 11",
+    "source": -1001111111121,
+    "destination": -1009999999901,
+    "reaction": "⚡",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 12",
+    "source": -1001111111122,
+    "destination": -1009999999902,
+    "reaction": "💎",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 13",
+    "source": -1001111111123,
+    "destination": -1009999999903,
+    "reaction": "🚀",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 14",
+    "source": -1001111111124,
+    "destination": -1009999999904,
+    "reaction": "✅",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 15",
+    "source": -1001111111125,
+    "destination": -1009999999905,
+    "reaction": "😍",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 16",
+    "source": -1001111111126,
+    "destination": -1009999999906,
+    "reaction": "🤩",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 17",
+    "source": -1001111111127,
+    "destination": -1009999999907,
+    "reaction": "💪",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 18",
+    "source": -1001111111128,
+    "destination": -1009999999908,
+    "reaction": "👌",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 19",
+    "source": -1001111111129,
+    "destination": -1009999999909,
+    "reaction": "🫡",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 20",
+    "source": -1001111111130,
+    "destination": -1009999999910,
+    "reaction": "🥰",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 21",
+    "source": -1001111111131,
+    "destination": -1009999999911,
+    "reaction": "😎",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 22",
+    "source": -1001111111132,
+    "destination": -1009999999912,
+    "reaction": "🎯",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 23",
+    "source": -1001111111133,
+    "destination": -1009999999913,
+    "reaction": "💥",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  },
+  {
+    "name": "Channel 24",
+    "source": -1001111111134,
+    "destination": -1009999999914,
+    "reaction": "🌟",
+    "enabled": true,
+    "copy_reaction_to_source": false
+  }
+]
