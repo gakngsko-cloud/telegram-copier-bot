@@ -82,6 +82,7 @@ async def handle_message(event, rule):
         # 1. COPY
         if copy_on:
             try:
+                # Sirf channel (-100) ke liye Bot API try karo
                 if str(event.chat_id).startswith("-100"):
                     copied = await app.bot.copy_message(
                         chat_id=rule["destination"],
@@ -89,32 +90,50 @@ async def handle_message(event, rule):
                         message_id=event.message.id,
                     )
                 else:
-                    copied = await event.message.copy_to(rule["destination"])
-                log.info(f"📋 [{rule['name']}] copied msg #{event.message.id}")
+                    # User ya normal group ke liye direct Telethon use karo
+                    raise Exception("User/Group chat, using Telethon")
             except Exception as e:
-                log.error(f"Copy failed via Bot, trying Telethon... [{rule['name']}]")
-                copied = await event.message.copy_to(rule["destination"])
+                # Telethon fallback (drop_author=True se "Forwarded" tag nahi aayega)
+                try:
+                    fwd = await reader.forward_messages(
+                        entity=rule["destination"],
+                        messages=event.message.id,
+                        from_peer=event.chat_id,
+                        drop_author=True
+                    )
+                    copied = fwd[0] if isinstance(fwd, list) else fwd
+                    log.info(f"📋 [{rule['name']}] copied via Telethon (no forward tag)")
+                except Exception as te:
+                    log.error(f"❌ [{rule['name']}] Telethon copy failed: {te}")
+                    raise te
+            
+            log.info(f"📋 [{rule['name']}] copied msg #{event.message.id}")
 
-        # 2. REACTION
+        # 2. REACTION (via User Account for multiple support)
         if react_on and rule.get("reaction"):
             emojis = [e.strip() for e in rule["reaction"].split(",") if e.strip()]
             if emojis:
                 try:
                     if copied:
+                        # Check karo ki copied message Bot API se aaya hai ya Telethon se
+                        msg_id = copied.message_id if hasattr(copied, "message_id") else copied.id
+                        
                         try:
-                            dest_msg = await reader.get_messages(rule["destination"], ids=copied.id)
+                            dest_msg = await reader.get_messages(rule["destination"], ids=msg_id)
                             if dest_msg:
                                 if isinstance(dest_msg, list): dest_msg = dest_msg[0]
                                 await dest_msg.react(emojis)
                                 log.info(f"💫 [{rule['name']}] reacted on copy via User Account ({emojis})")
                         except Exception as e:
                             log.warning(f"Telethon react on copy failed, trying bot: {e}")
-                            await app.bot.set_message_reaction(
-                                chat_id=rule["destination"],
-                                message_id=copied.id,
-                                reaction=emojis[0]
-                            )
+                            if hasattr(copied, "message_id"):
+                                await app.bot.set_message_reaction(
+                                    chat_id=rule["destination"],
+                                    message_id=copied.message_id,
+                                    reaction=emojis[0]
+                                )
                     else:
+                        # Agar copy OFF hai, toh source message par react karo
                         await event.message.react(emojis)
                         log.info(f"💫 [{rule['name']}] reacted on source via User Account ({emojis})")
                 except Exception as e:
