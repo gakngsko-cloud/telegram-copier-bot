@@ -8,7 +8,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
-from telethon.sessions import StringSession  # <-- StringSession add kiya
+from telethon.sessions import StringSession
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import RetryAfter, TelegramError
 from telegram.ext import (
@@ -65,7 +65,6 @@ def find_rule_by_source(source_id):
     return None
 
 # ---------- Clients ----------
-# StringSession use karega agar .env mein hai, warna file fallback
 if SESSION_STRING:
     reader = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 else:
@@ -405,11 +404,20 @@ async def handle_forward(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     chat_id = None
     title = "Channel"
-    if msg.forward_from_chat:
+
+    # Naya forward_origin check karo (PTB v21+)
+    if getattr(msg, "forward_origin", None):
+        if msg.forward_origin.type == "channel":
+            chat_id = msg.forward_origin.chat.id
+            title = msg.forward_origin.chat.title or "Channel"
+        elif msg.forward_origin.type == "user":
+            return await msg.reply_text("❌ User ka message forward mat karo. Sirf *Channel* ka message forward karo.", parse_mode="Markdown")
+
+    # Agar purane tareeke se forward hua hai (backup)
+    elif getattr(msg, "forward_from_chat", None):
         chat_id = msg.forward_from_chat.id
         title = msg.forward_from_chat.title or "Channel"
-        if msg.forward_from_chat.type == "channel":
-            chat_id = int(f"-100{chat_id}")
+
     if not chat_id:
         return await msg.reply_text("❌ Channel ka message forward karo (user ka nahi).")
 
