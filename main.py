@@ -8,6 +8,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession  # <-- StringSession add kiya
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import RetryAfter, TelegramError
 from telegram.ext import (
@@ -23,6 +24,7 @@ API_HASH = os.getenv("TG_API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SESSION_NAME = os.getenv("SESSION_NAME", "copier_session")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+SESSION_STRING = os.getenv("SESSION_STRING")
 
 # ---------- Paths ----------
 DATA_DIR = "/data" if os.path.isdir("/data") else "."
@@ -63,7 +65,12 @@ def find_rule_by_source(source_id):
     return None
 
 # ---------- Clients ----------
-reader = TelegramClient(SESSION_PATH, API_ID, API_HASH)
+# StringSession use karega agar .env mein hai, warna file fallback
+if SESSION_STRING:
+    reader = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+else:
+    reader = TelegramClient(SESSION_PATH, API_ID, API_HASH)
+
 app = Application.builder().token(BOT_TOKEN).build()
 
 # ---------- Copy + React logic (SEPARATE) ----------
@@ -87,7 +94,6 @@ async def handle_message(event, rule):
             emoji = rule["reaction"]
             try:
                 if copied:
-                    # React on the copied message in destination (via bot)
                     await app.bot.set_message_reaction(
                         chat_id=rule["destination"],
                         message_id=copied.message_id,
@@ -95,7 +101,6 @@ async def handle_message(event, rule):
                     )
                     log.info(f"💫 [{rule['name']}] reacted on copy ({emoji})")
                 else:
-                    # Copy off → react on SOURCE via Telethon (reader)
                     await event.message.react(emoji)
                     log.info(f"💫 [{rule['name']}] reacted on source ({emoji})")
             except Exception as e:
@@ -166,7 +171,6 @@ def build_list_view():
             f"   📋 Copy {copy_st} | 💫 React {react_st} {c.get('reaction','')}\n"
             f"   `{c['source']}` → `{c['destination']}`"
         )
-        # Row 1: feature toggles
         kb.append([
             InlineKeyboardButton(
                 f"📋 Copy {'✅' if c.get('copy_enabled', True) else '❌'}",
@@ -177,7 +181,6 @@ def build_list_view():
                 callback_data=f"ch:react:{i}"
             ),
         ])
-        # Row 2: enable/disable + remove
         kb.append([
             InlineKeyboardButton(
                 f"{'🔴 Disable' if c.get('enabled', True) else '🟢 Enable'} — {c['name'][:15]}",
@@ -230,7 +233,6 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await q.answer()
     data = q.data
 
-    # ----- Main menu -----
     if data == "menu:main":
         ctx.user_data.clear()
         return await send_main_menu(q, edit=True)
@@ -260,7 +262,6 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         kb = [[InlineKeyboardButton("🔙 Back", callback_data="menu:main")]]
         return await q.edit_message_text(txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
 
-    # ----- Add wizard start -----
     if data == "menu:add":
         ctx.user_data.clear()
         ctx.user_data["step"] = "source"
@@ -273,12 +274,10 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         kb = [[InlineKeyboardButton("❌ Cancel", callback_data="wizard:cancel")]]
         return await q.edit_message_text(txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
 
-    # ----- List -----
     if data == "menu:list":
         txt, kb = build_list_view()
         return await q.edit_message_text(txt, reply_markup=kb, parse_mode="Markdown")
 
-    # ----- Channel toggles -----
     if data.startswith("ch:copy:"):
         idx = int(data.split(":")[2])
         ch = load_channels()
@@ -322,7 +321,6 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         txt, kb = build_list_view()
         return await q.edit_message_text(txt, reply_markup=kb, parse_mode="Markdown")
 
-    # ----- Config toggles (during add) -----
     if data == "cfg:copy":
         ctx.user_data["copy_enabled"] = not ctx.user_data.get("copy_enabled", True)
         return await show_config_screen(q, ctx)
@@ -331,7 +329,6 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ctx.user_data["reaction_enabled"] = not ctx.user_data.get("reaction_enabled", True)
         return await show_config_screen(q, ctx)
 
-    # ----- Save new channel -----
     if data == "cfg:done":
         copy_on = ctx.user_data.get("copy_enabled", True)
         react_on = ctx.user_data.get("reaction_enabled", True)
@@ -381,7 +378,6 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ]
         return await q.edit_message_text(txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
 
-    # ----- Cancel -----
     if data == "wizard:cancel":
         ctx.user_data.clear()
         return await send_main_menu(q, edit=True)
@@ -470,7 +466,7 @@ async def verify_access():
         if not rule.get("enabled", True):
             continue
         if not rule.get("copy_enabled", True):
-            continue  # No destination access needed if copy is off
+            continue
         try:
             member = await app.bot.get_chat_member(rule["destination"], me.id)
             if member.status in ("administrator", "creator"):
