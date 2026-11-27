@@ -501,4 +501,81 @@ async def handle_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 ctx.user_data["step"] = "destination"
                 
                 kb = [[InlineKeyboardButton("❌ Cancel", callback_data="wizard:cancel")]]
-                await update.messa
+                await update.message.reply_text(
+                    f"✅ Source set: *{title}*\n`{real_id}`\n\n"
+                    "📤 *Step 2/3* — Ab *Destination* (jahan bhejna hai) ka message forward karo.",
+                    reply_markup=InlineKeyboardMarkup(kb),
+                    parse_mode="Markdown",
+                )
+            except Exception as e:
+                await update.message.reply_text(f"❌ User/Entity nahi mila. Error: `{e}`\nDobara sahi ID ya @username bhejein.", parse_mode="Markdown")
+        else:
+            await update.message.reply_text("❌ Galat format. Sirf @username, t.me link, ya numeric ID bhejein.")
+            
+    elif step == "reaction":
+        text = update.message.text.strip()
+        if text.lower() == 'skip':
+            ctx.user_data["reaction"] = ""
+        else:
+            emojis = [e.strip() for e in text.split(",") if e.strip()]
+            ctx.user_data["reaction"] = ",".join(emojis)
+            
+        ctx.user_data["copy_enabled"] = True
+        ctx.user_data["reaction_enabled"] = True
+        ctx.user_data["step"] = "config"
+        
+        await send_config_screen(update.message, ctx, edit=False)
+
+# ---------- Verify access ----------
+async def verify_access():
+    channels = load_channels()
+    if not channels:
+        log.warning("⚠️ Koi source nahi. Telegram par /start bhejo.")
+        return
+    ok, bad = 0, 0
+    me = await app.bot.get_me()
+    for rule in channels:
+        if not rule.get("enabled", True) or not rule.get("copy_enabled", True):
+            continue
+        try:
+            if str(rule["destination"]).startswith("-100"):
+                member = await app.bot.get_chat_member(rule["destination"], me.id)
+                if member.status in ("administrator", "creator"):
+                    ok += 1
+                else:
+                    log.warning(f"⚠️ Bot admin nahi hai: {rule['name']}")
+                    bad += 1
+        except TelegramError as e:
+            log.error(f"❌ [{rule['name']}]: {e}")
+            bad += 1
+    log.info(f"Access: ✅ {ok} OK | ⚠️ {bad} problems")
+
+# ---------- Register handlers ----------
+app.add_handler(CommandHandler("start", cmd_start))
+app.add_handler(CallbackQueryHandler(on_callback))
+app.add_handler(MessageHandler(filters.FORWARDED, handle_forward))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+
+# ---------- Main ----------
+async def main():
+    log.info("🚀 Starting Telegram Copier Bot...")
+    me = await app.bot.get_me()
+    log.info(f"🤖 Bot: @{me.username}")
+
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+    log.info("✅ Bot polling started")
+
+    await reader.start()
+    log.info("✅ Reader logged in")
+
+    await verify_access()
+    log.info("🟢 Bot 24/7 chalu hai.")
+    await reader.run_until_disconnected()
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        log.info("🛑 Stopped.")
