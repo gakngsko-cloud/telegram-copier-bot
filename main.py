@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from telethon import TelegramClient, events
+from telethon import TelegramClient, events, utils
 from telethon.sessions import StringSession
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import RetryAfter, TelegramError
@@ -82,7 +82,6 @@ async def handle_message(event, rule):
         # 1. COPY
         if copy_on:
             try:
-                # Sirf channel (-100) ke liye Bot API try karo
                 if str(event.chat_id).startswith("-100"):
                     copied = await app.bot.copy_message(
                         chat_id=rule["destination"],
@@ -90,10 +89,8 @@ async def handle_message(event, rule):
                         message_id=event.message.id,
                     )
                 else:
-                    # User ya normal group ke liye direct Telethon use karo
                     raise Exception("User/Group chat, using Telethon")
             except Exception as e:
-                # Telethon fallback (drop_author=True se "Forwarded" tag nahi aayega)
                 try:
                     fwd = await reader.forward_messages(
                         entity=rule["destination"],
@@ -102,42 +99,45 @@ async def handle_message(event, rule):
                         drop_author=True
                     )
                     copied = fwd[0] if isinstance(fwd, list) else fwd
-                    log.info(f"📋 [{rule['name']}] copied via Telethon (no forward tag)")
+                    log.info(f"📋 [{rule['name']}] copied via Telethon")
                 except Exception as te:
                     log.error(f"❌ [{rule['name']}] Telethon copy failed: {te}")
                     raise te
             
             log.info(f"📋 [{rule['name']}] copied msg #{event.message.id}")
 
-        # 2. REACTION (via User Account for multiple support)
+        # 2. REACTION
         if react_on and rule.get("reaction"):
             emojis = [e.strip() for e in rule["reaction"].split(",") if e.strip()]
             if emojis:
                 try:
                     if copied:
-                        # Check karo ki copied message Bot API se aaya hai ya Telethon se
                         msg_id = copied.message_id if hasattr(copied, "message_id") else copied.id
                         
                         try:
-                            dest_msg = await reader.get_messages(rule["destination"], ids=msg_id)
+                            entity = await reader.get_entity(rule["destination"])
+                            dest_msg = await reader.get_messages(entity, ids=msg_id)
+                            
                             if dest_msg:
                                 if isinstance(dest_msg, list): dest_msg = dest_msg[0]
                                 await dest_msg.react(emojis)
-                                log.info(f"💫 [{rule['name']}] reacted on copy via User Account ({emojis})")
+                                log.info(f"💫 [{rule['name']}] reacted via User Account ({emojis})")
+                            else:
+                                log.warning(f"⚠️ Message ID {msg_id} not found in destination.")
+                                
                         except Exception as e:
-                            log.warning(f"Telethon react on copy failed, trying bot: {e}")
-                            if hasattr(copied, "message_id"):
-                                await app.bot.set_message_reaction(
-                                    chat_id=rule["destination"],
-                                    message_id=copied.message_id,
-                                    reaction=emojis[0]
-                                )
+                            log.warning(f"⚠️ Telethon reaction failed: {e}. Trying Bot API...")
+                            await app.bot.set_message_reaction(
+                                chat_id=rule["destination"],
+                                message_id=msg_id,
+                                reaction=emojis[0]
+                            )
+                            log.info(f"💫 [{rule['name']}] reacted via Bot API ({emojis[0]})")
                     else:
-                        # Agar copy OFF hai, toh source message par react karo
                         await event.message.react(emojis)
-                        log.info(f"💫 [{rule['name']}] reacted on source via User Account ({emojis})")
+                        log.info(f"💫 [{rule['name']}] reacted on source ({emojis})")
                 except Exception as e:
-                    log.warning(f"Reaction failed [{rule['name']}]: {e}")
+                    log.error(f"❌ Reaction totally failed [{rule['name']}]: {e}")
 
         await asyncio.sleep(1.5)
     except RetryAfter as e:
@@ -283,7 +283,7 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "3. Reaction emojis type karo (comma lagakar multiple dal sakte ho, jaise `👍,🔥`)\n"
             "4. Copy / Reaction ON-OFF karo\n"
             "5. Done ✅\n\n"
-            "*Note:* Reaction hamesha aapke account se lagega (multiple support ke liye)."
+            "*Note:* Agar kisi user ki privacy on hai, toh bot aapse unka @username maangega."
         )
         kb = [[InlineKeyboardButton("🔙 Back", callback_data="menu:main")]]
         return await q.edit_message_text(txt, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
@@ -417,7 +417,13 @@ async def handle_forward(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             chat_id = origin.sender_user.id
             title = f"{origin.sender_user.first_name or ''} {origin.sender_user.last_name or ''}".strip() or "User"
         elif origin.type == "hidden_user":
-            return await msg.reply_text("❌ Is user ne privacy on ki hai. Aap direct unki ID nahi nikal sakte.")
+            ctx.user_data["step"] = "manual_source"
+            return await msg.reply_text(
+                "❌ *Is user ne privacy on ki hai.*\n\n"
+                "Telegram forward karne par ID nahi de raha. Kripya us user ka **@username** ya **User ID** type karke bhejein.\n"
+                "Ya unki profile link copy karke bhejein (jaise: `t.me/username`).",
+                parse_mode="Markdown"
+            )
     elif getattr(msg, "forward_from_chat", None):
         chat_id = msg.forward_from_chat.id
         title = msg.forward_from_chat.title or "Chat"
@@ -467,70 +473,32 @@ async def handle_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     
     if step in ("source", "destination"):
         await update.message.reply_text("⏳ Pehle message *forward* karo, text nahi.", parse_mode="Markdown")
-    elif step == "reaction":
+    elif step == "manual_source":
         text = update.message.text.strip()
-        if text.lower() == 'skip':
-            ctx.user_data["reaction"] = ""
-        else:
-            emojis = [e.strip() for e in text.split(",") if e.strip()]
-            ctx.user_data["reaction"] = ",".join(emojis)
-            
-        ctx.user_data["copy_enabled"] = True
-        ctx.user_data["reaction_enabled"] = True
-        ctx.user_data["step"] = "config"
+        chat_id = None
         
-        await send_config_screen(update.message, ctx, edit=False)
-
-# ---------- Verify access ----------
-async def verify_access():
-    channels = load_channels()
-    if not channels:
-        log.warning("⚠️ Koi source nahi. Telegram par /start bhejo.")
-        return
-    ok, bad = 0, 0
-    me = await app.bot.get_me()
-    for rule in channels:
-        if not rule.get("enabled", True) or not rule.get("copy_enabled", True):
-            continue
-        try:
-            if str(rule["destination"]).startswith("-100"):
-                member = await app.bot.get_chat_member(rule["destination"], me.id)
-                if member.status in ("administrator", "creator"):
-                    ok += 1
-                else:
-                    log.warning(f"⚠️ Bot admin nahi hai: {rule['name']}")
-                    bad += 1
-        except TelegramError as e:
-            log.error(f"❌ [{rule['name']}]: {e}")
-            bad += 1
-    log.info(f"Access: ✅ {ok} OK | ⚠️ {bad} problems")
-
-# ---------- Register handlers ----------
-app.add_handler(CommandHandler("start", cmd_start))
-app.add_handler(CallbackQueryHandler(on_callback))
-app.add_handler(MessageHandler(filters.FORWARDED, handle_forward))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-
-# ---------- Main ----------
-async def main():
-    log.info("🚀 Starting Telegram Copier Bot...")
-    me = await app.bot.get_me()
-    log.info(f"🤖 Bot: @{me.username}")
-
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling()
-    log.info("✅ Bot polling started")
-
-    await reader.start()
-    log.info("✅ Reader logged in")
-
-    await verify_access()
-    log.info("🟢 Bot 24/7 chalu hai.")
-    await reader.run_until_disconnected()
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        log.info("🛑 Stopped.")
+        if text.startswith("@"):
+            chat_id = text
+        elif "t.me/" in text:
+            parts = text.split("t.me/")
+            if len(parts) == 2:
+                path = parts[1].split("/")
+                if len(path) >= 2 and path[0] == "c":
+                    chat_id = int(f"-100{path[1]}")
+                elif len(path) >= 1:
+                    chat_id = f"@{path[0]}"
+        elif text.lstrip("-").isdigit():
+            chat_id = int(text)
+        
+        if chat_id:
+            try:
+                entity = await reader.get_entity(chat_id)
+                real_id = utils.get_peer_id(entity)
+                title = getattr(entity, 'title', None) or getattr(entity, 'first_name', 'User')
+                
+                ctx.user_data["source"] = real_id
+                ctx.user_data["source_name"] = title
+                ctx.user_data["step"] = "destination"
+                
+                kb = [[InlineKeyboardButton("❌ Cancel", callback_data="wizard:cancel")]]
+                await update.
