@@ -90,7 +90,7 @@ async def handle_message(event, rule):
                     )
                 else:
                     raise Exception("User/Group chat, using Telethon")
-            except Exception as e:
+            except Exception:
                 try:
                     fwd = await reader.forward_messages(
                         entity=rule["destination"],
@@ -501,4 +501,4 @@ async def handle_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 ctx.user_data["step"] = "destination"
                 
                 kb = [[InlineKeyboardButton("❌ Cancel", callback_data="wizard:cancel")]]
-                await update.
+                await update.messa
